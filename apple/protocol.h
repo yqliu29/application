@@ -17,8 +17,11 @@
 /******************************************************** 
  * General Lingo Commands
  *******************************************************/ 
-#define StartIDPS				0x38
-#define SetFIDTokenValues		0x39
+#define RequestTransportMaxPayloadSize		0x11
+#define ReturnTransportMaxPayloadSize		0x12
+#define StartIDPS							0x38
+#define SetFIDTokenValues					0x39
+#define AckFIDTokenValues					0x3A
 
 /******************************************************** 
  * functions

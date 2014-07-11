@@ -66,8 +66,6 @@ int ipod_protocol_build_basic_command(ipod_device_t *dev, uint8_t *buf, uint8_t 
 static int ipod_protocol_StartIDPS(ipod_device_t *dev)
 {
 	int i;
-	uint16_t tid1 = dev->send_tid;
-	uint16_t tid2;
 
 	/* fill and send StartIDPS */
 	i = ipod_protocol_build_basic_command(dev, buffer, GENERAL_LINGO_ID, StartIDPS, NULL, 0);
@@ -90,18 +88,106 @@ static int ipod_protocol_StartIDPS(ipod_device_t *dev)
 }
 
 /******************************************************** 
+ * send RequestTransportMaxPayloadSize
+ *******************************************************/ 
+static int ipod_protocol_RequestTransportMaxPayloadSize(ipod_device_t *dev)
+{
+	int i;
+
+	/* fill and send RequestTransportMaxPayloadSize */
+	i = ipod_protocol_build_basic_command(dev, buffer, GENERAL_LINGO_ID,
+			RequestTransportMaxPayloadSize, NULL, 0);
+	i = ipod_send_command(dev, buffer, i);
+	if (i < 0)
+	{
+		ERROR("Failed to send RequestTransportMaxPayloadSize: %d\n", errno);
+		return i;
+	}
+
+	/* watting for ReturnTransportMaxPayloadSize */
+	i = ipod_receive_command(dev, buffer, 1000);
+	if (i < 0)
+	{
+		ERROR("Failed to receive ReturnTransportMaxPayloadSize: %d\n", errno);
+		return i;
+	}
+
+	return 0;
+}
+
+/******************************************************** 
+ * send SetFIDTokenValues
+ *******************************************************/ 
+static int ipod_protocol_SetFIDTokenValues(ipod_device_t *dev)
+{
+	int i;
+	uint8_t tokens[512];
+	uint8_t *p;
+	uint32_t *p32;
+
+	/* fill SetFIDTokenValues */
+	tokens[0] = 2;
+	p = &tokens[1];	
+
+	/* fill IdentifyToken */
+	p[0] = 14;				/* length */
+	p[1] = 0;				/* FIDType */
+	p[2] = 0;				/* FIDSubtype */
+	p[3] = 3;				/* numLingos */
+	p[4] = 0;
+	p[5] = 2;
+	p[6] = 4;
+	p32 = (uint32_t *)&p[7];
+	p32[0] = 0x00000002;	/* DeviceOptions */
+	p32[1] = 0x01020304;	/* DeviceID */
+
+	p += p[0] + 1;
+
+	/* fill AccessoryCapsToken */
+	p[0] = 10;				/* length */
+	p[1] = 0;				/* FIDType */
+	p[2] = 1;				/* FIDSubtype */
+	p32 = (uint32_t *)&p[3];
+	p32[0] = 0;
+	p32[1] = 0;
+
+	p += p[0] + 1;
+
+	/* fill SetFIDTokenValues */
+	i = ipod_protocol_build_basic_command(dev, buffer, GENERAL_LINGO_ID,
+			SetFIDTokenValues, tokens, p - tokens);
+	i = ipod_send_command(dev, buffer, i);
+	if (i < 0)
+	{
+		ERROR("Failed to send SetFIDTokenValues: %d\n", errno);
+		return i;
+	}
+
+	/* watting for AckFIDTokenValues */
+	i = ipod_receive_command(dev, buffer, 1000);
+	if (i < 0)
+	{
+		ERROR("Failed to receive AckFIDTokenValues: %d\n", errno);
+		return i;
+	}
+}
+
+/******************************************************** 
  * Identification process
  *******************************************************/ 
 int ipod_protocol_identificate(ipod_device_t *dev)
 {
 	int ret;
-	hid_report_t report;
-
-	ret = ipod_get_hid_report_descriptor(dev->fd, &report);
-	if (ret < 0)
-		return ret;
 
 	ret = ipod_protocol_StartIDPS(dev);
+	if (ret < 0)
+		return -1;
+
+	ret = ipod_protocol_RequestTransportMaxPayloadSize(dev);
+	if (ret < 0)
+		return -1;
+
+	ret = ipod_protocol_SetFIDTokenValues(dev);
 	if (ret < 0)
 		return -1;
 }

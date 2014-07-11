@@ -20,7 +20,7 @@
 #include <linux/usbdevice_fs.h>
 #include <linux/usb/ch9.h>
 
-/* #define DESCRIPTOR_DEBUG */
+#define DESCRIPTOR_DEBUG
 #define COMMAND_SEND_DEBUG
 #define INFO(fmt, args...) 			fprintf(stderr, fmt, ##args)
 #define ERROR(fmt, args...)			fprintf(stderr, fmt, ##args)

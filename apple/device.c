@@ -93,16 +93,7 @@ int ipod_receive_command(ipod_device_t *dev, uint8_t *cmd, int timeout)
 {
 	struct usbdevfs_urb urb;
 	struct usbdevfs_urb *context;
-	struct timeval tv, tvref;
-	fd_set fds;
 	int ret;
-	int waitting = 1;
-
-	/* calculate timeout */
-	gettimeofday(&tv, NULL);
-	tvref.tv_sec = (timeout * 1000)/1000000;
-	tvref.tv_usec = (timeout * 1000)%1000000;
-	timeradd(&tv, &tvref, &tvref);
 
 	/* fill URB */
 	urb.type              = USBDEVFS_URB_TYPE_INTERRUPT;
@@ -122,35 +113,18 @@ int ipod_receive_command(ipod_device_t *dev, uint8_t *cmd, int timeout)
 		return ret;
 	}
 
-	FD_ZERO(&fds);
-	FD_SET(dev->fd, &fds);
-	while (waitting)
+	while (1)
 	{
-		ret = ioctl(dev->fd, USBDEVFS_REAPURBNDELAY, &context);
-		if (ret == 0)
+		ret = ioctl(dev->fd, USBDEVFS_REAPURB, &context);
+		if ((ret == 0) && (urb.actual_length > 0))
 		{
 			debug_command_receive(cmd, urb.actual_length);
 			return urb.actual_length;
 		}
-
-		tv.tv_sec = 0;
-		tv.tv_usec = 100000;
-		ret = select(dev->fd + 1, NULL, &fds, NULL, &tv);
-
-		if (urb.actual_length > 0)
+		else if (ret < 0)
 		{
-			debug_command_receive(cmd, urb.actual_length);
-			return urb.actual_length;
-		}
-
-		if (timeout)
-		{
-			gettimeofday(&tv, NULL);
-			if (timercmp(&tv, &tvref, >=))
-			{
-				waitting = 0;
-				ERROR("Timeout happened waitting for device!\n");
-			}
+			fprintf(stderr, "Failed to reap, error code %d\n", errno);
+			return -1;
 		}
 	}
 
